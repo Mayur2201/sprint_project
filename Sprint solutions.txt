@@ -1,0 +1,114 @@
+--Create databse and schema
+create or replace database my_db;
+create or replace schema my_schema;
+
+--Create table called as heartconditions
+create or replace table heartconditions(
+HeartDisease varchar,
+BMI	float,
+Smoking varchar,
+AlcoholDrinking varchar,
+Stroke	varchar,
+PhysicalHealth	number,
+MentalHealth	number,
+DiffWalking	varchar,
+Sex	varchar,
+AgeCategory varchar,
+Race varchar,
+Diabetic varchar,
+PhysicalActivity varchar,
+GenHealth varchar,
+SleepTime number,
+Asthma varchar,
+KidneyDisease varchar,
+SkinCancer varchar
+)
+--Caheck whether the data is loaded or not 
+select * from heartconditionsbackup;
+
+--Create a backup table
+create or replace table heartconditionsbackup(
+HeartDisease varchar,
+BMI	float,
+Smoking varchar,
+AlcoholDrinking varchar,
+Stroke	varchar,
+PhysicalHealth	number,
+MentalHealth	number,
+DiffWalking	varchar,
+Sex	varchar,
+AgeCategory varchar,
+Race varchar,
+Diabetic varchar,
+PhysicalActivity varchar,
+GenHealth varchar,
+SleepTime number,
+Asthma varchar,
+KidneyDisease varchar,
+SkinCancer varchar
+)
+
+--Insert data into backup table (heartconditionsbackup) from heartconditions table
+insert into heartconditionsbackup
+select * from heartconditions;
+
+--create a new stream for heartconditions table
+create or replace stream  
+heart_stream on table heartconditions
+append_only=true;
+
+--create task for heartconditions table
+create or replace task heart_task
+    warehouse = compute_wh
+    schedule  = '5 minute'
+  when
+    system$stream_has_data('heart_stream')
+  as
+    insert into heartconditions select * from heart_stream;
+
+-- insert a row in heartconditions table
+insert into heartconditions values 
+('No',27.2,'Yes','No',
+ 'Yes',0,0,'No','Male','80 or older',
+ 'White','No','No','Very good',8,'No','No','Yes');
+ 
+--check the task history
+select * from table(information_schema.task_history())
+order by scheduled_time;
+
+select * from table(information_schema.task_history())
+where state ='SCHEDULED' order by scheduled_time;
+
+--Performs operations on data 
+
+--which gender have majority heart attack
+select sex as Gender, count(heartdisease) as "Heart Attack" from heartconditions
+where heartdisease = 'Yes'
+group by sex;
+
+--which combination of physical and mental health causes stroke
+select count( Stroke) stroke,PhysicalHealth,MentalHealth
+from heartconditions
+where stroke = 'Yes'
+group by PhysicalHealth	,MentalHealth;
+
+--GenHealth wise average BMI of people
+select round(avg(bmi)) bmi, genhealth
+from heartconditions
+group by genhealth;
+
+--Average age of people having problem in walking
+select AgeCategory,count(DiffWalking)
+from heartconditions
+where diffwalking = 'Yes'
+group by agecategory;
+
+-- Count the different combination of people having heart-attack against BMI, Smoking ,AlcoholDrink,Stroke,Diabetic,Kidney Diseases,skin cancer
+select BMI,Smoking,AlcoholDrinking,Stroke,Diabetic,KidneyDisease,SkinCancer,HeartDisease
+from heartconditions
+where heartdisease = 'Yes';
+
+--Average BMI of people having Skin Cancer
+select round(avg(bmi)) bmi
+from heartconditions
+where SkinCancer = 'Yes';
